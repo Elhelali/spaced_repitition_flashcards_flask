@@ -1,0 +1,6 @@
+env
+frontend
+config.py
+*.pyc
+build/
+static/
