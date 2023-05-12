@@ -1,6 +1,8 @@
-from config import mongo_username,mongo_password,mongo_url
+from config import mongo_username, mongo_password, mongo_url
 import pymongo
 from functools import wraps
+
+
 def mongo(f):
     @wraps(f)
     def wrap(*args, **kwargs):
