@@ -1,4 +1,4 @@
-from flask import jsonify, Blueprint, request, render_template, make_response
+from flask import Blueprint, request, render_template, make_response
 from decorators import mongo
 import os
 import uuid
@@ -8,14 +8,6 @@ from pymongo import ReturnDocument
 flashcards = Blueprint(
     "flashcards", __name__, static_folder="build/static", template_folder="build"
 )
-
-
-@flashcards.route("/")
-def main():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    build_dir = os.path.join(current_dir, "build")
-    return render_template("index.html")
-
 
 @flashcards.route("/get_words")
 @mongo
@@ -48,8 +40,9 @@ def delete_word(db):
     except Exception as E:
         print(E)
         return {"success": False}
+    
 
-
+# Create a new user. Sets a cookie to remember the user.
 @flashcards.route("/create_user", methods=["POST"])
 @mongo
 def create_user(db):
@@ -60,11 +53,11 @@ def create_user(db):
     for word in words:
         user_words.append(
             {
-                "word": word["_id"],
-                "definition": word["definition"],
-                "bin": 0,
-                "wrong_count": 0,
-                "last_answer": time.time() - 5,  # so it appears now, not in 5 seconds
+                "word": word["_id"], #word id = the word itself
+                "definition": word["definition"], #word definition
+                "bin": 0, #bins go from 0 to 11, higher bins represent higher competence
+                "wrong_count": 0, #Life time wrong count to determine unusually difficult words
+                "last_answer": time.time() - 5,  # initial setting allows word to appears now, not in 5 seconds
             }
         )
     db["users"].insert_one({"_id": _id, "words": user_words})
@@ -72,6 +65,7 @@ def create_user(db):
     return resp
 
 
+# Get a user based on their cookie.
 @flashcards.route("/get_user")
 @mongo
 def get_user(db):
@@ -83,6 +77,7 @@ def get_user(db):
         return {"success": False}
 
 
+#Submit a user's answer and update their progress.
 @flashcards.route("/submit_result", methods=["POST"])
 @mongo
 def submit_result(db):
@@ -90,7 +85,7 @@ def submit_result(db):
         data = request.json
         successful = data["result"]
 
-        # user= db['users'].find_one({'user':data['user']})
+        # Function to standardize/DRY update queries
         def increment_query(inc=1):
             db_query = {
                 "$set": {"words.$[elem].last_answer": time.time()},
@@ -104,8 +99,8 @@ def submit_result(db):
                 }
             return db_query
 
-        if successful:  # answered correctly
-            query = increment_query(1)
+        if successful:  # If answered correctly
+            query = increment_query(1) # Move up 1 in bin/competence
         else:
             if data["bin"] == 0:
                 query = increment_query(0)
@@ -123,21 +118,28 @@ def submit_result(db):
         print(E)
         return {"success": False}
 
-
+#This function exists to synchronize user words with the words database
 @flashcards.route("/update_user_words", methods=["POST"])
 @mongo
 def update_user_words(db):
     try:
         user_id = request.cookies.get("_id")
+        #Get the user
         user = db["users"].find_one({"_id": user_id})
         user_words = user["words"]
+        #Get all words as an array for easier comparison 
         user_word_ids = {word["word"] for word in user_words}
+        #Get all words in words/admin db (source of truth)
         admin_words = list(db["words"].find())
+        #Create a list of new user words, which will be used to update user
         new_user_words = []
+        #First loop is used to remove any user words no longer in words/admin db
         for user_word in user_words:
             for word in admin_words:
                 if word["_id"] == user_word["word"]:
                     new_user_words.append(user_word)
+                    
+        #Second loop is to add any words in words db not in user words
         for word in admin_words:
             if word["_id"] not in user_word_ids:
                 new_user_words.append(
@@ -149,7 +151,7 @@ def update_user_words(db):
                         "wrong_count": 0,
                     }
                 )
-
+        # Run user db update, return updated user using Return Document
         user = db["users"].find_one_and_update(
             {"_id": user_id},
             {
