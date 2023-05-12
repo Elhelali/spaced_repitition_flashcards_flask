@@ -87,8 +87,6 @@ def submit_result(db):
                 }
             if inc>0:
                 db_query['$inc'] = { 'words.$[elem].bin' : inc }
-            elif inc ==0:
-                pass
             else:
                 db_query['$inc'] = { 'words.$[elem].bin' : inc, 'words.$[elem].wrong_count':1 }
             return db_query
