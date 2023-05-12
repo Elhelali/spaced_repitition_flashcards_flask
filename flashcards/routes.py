@@ -110,3 +110,36 @@ def submit_result(db):
     except Exception as E:
         print(E)
         return {'success' : False}
+    
+@flashcards.route('/update_user_words',methods=['POST'])
+@mongo
+def update_user_words(db):
+    try:
+        user_id = request.cookies.get("_id")
+        user = db['users'].find_one({'_id':user_id})
+        user_words = user['words']
+        user_word_ids = {word['word'] for word in user_words}
+        admin_words = list(db['words'].find())
+        new_user_words = []
+        for user_word in user_words:
+            for word in admin_words:
+                if word['_id'] == user_word['word']:
+                    new_user_words.append(user_word)
+        for word in admin_words:
+            if word['_id'] not in user_word_ids:
+                new_user_words.append({
+                    "word":word['_id'],
+                    "definition":word['definition'],
+                    "bin":0,
+                    "last_answer":time.time() - 5,
+                    "wrong_count":0
+                })
+
+        user = db['users'].find_one_and_update({"_id":user_id},{
+            "$set":{"words":new_user_words},
+            },
+            return_document=ReturnDocument.AFTER)
+        return {"success":True,"user":user}
+    except Exception as E:
+        print(E)
+        return {"success":False,"user":user}
