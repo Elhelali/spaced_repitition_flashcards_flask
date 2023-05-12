@@ -57,10 +57,13 @@ def create_user(db):
                 "definition": word["definition"], #word definition
                 "bin": 0, #bins go from 0 to 11, higher bins represent higher competence
                 "wrong_count": 0, #Life time wrong count to determine unusually difficult words
-                "last_answer": time.time() - 5,  # initial setting allows word to appears now, not in 5 seconds
+                "last_answer": time.time(),  # initial setting allows word to appears
             }
         )
-    db["users"].insert_one({"_id": _id, "words": user_words})
+    db["users"].insert_one({"_id": _id, 
+                            "words": user_words,
+                            "admin":True #In this simple implementation, there are no safeguards for admin page
+                            })
     resp.set_cookie("_id", _id)
     return resp
 
@@ -147,7 +150,7 @@ def update_user_words(db):
                         "word": word["_id"],
                         "definition": word["definition"],
                         "bin": 0,
-                        "last_answer": time.time() - 5,
+                        "last_answer": time.time(),
                         "wrong_count": 0,
                     }
                 )
