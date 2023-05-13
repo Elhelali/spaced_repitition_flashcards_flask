@@ -4,6 +4,7 @@ import os
 import uuid
 import time
 from pymongo import ReturnDocument
+from .utils import *
 
 flashcards = Blueprint(
     "flashcards", __name__, static_folder="build/static", template_folder="build"
@@ -20,27 +21,18 @@ def get_words(db):
 @flashcards.route("/add_word", methods=["POST"])
 @mongo
 def add_word(db):
-    try:
-        data = request.json
-        db_entry = {"_id": data["word"].lower(), "definition": data["definition"]}
-        db["words"].insert_one(db_entry)
-        return {"success": True}
-    except Exception as E:
-        print(E)
-        return {"success": False}
+    data = request.json
+    success = insert_word_into_db(db, data)
+    return {"success": success}
 
 
 @flashcards.route("/delete_word", methods=["POST"])
 @mongo
 def delete_word(db):
-    try:
-        word = request.json["word"]
-        db_entry = {"_id": word}
-        db["words"].delete_one(db_entry)
-        return {"success": True}
-    except Exception as E:
-        print(E)
-        return {"success": False}
+    word = request.json["word"]
+    success = delete_word_from_db(db, word)
+    return {"success": success}
+
 
 
 # Create a new user. Sets a cookie to remember the user.
@@ -64,6 +56,7 @@ def create_user(db):
         )
     db["users"].insert_one(
         {
+            "name":"",
             "_id": _id,
             "words": user_words,
             "admin": True,  # In this simple implementation, there are no safeguards for admin page
@@ -99,58 +92,19 @@ def get_all_users(db):
 @flashcards.route("/submit_result", methods=["POST"])
 @mongo
 def submit_result(db):
-    try:
-        data = request.json
-        successful = data["result"]
-
-        # Function to standardize/DRY update queries
-        def increment_query(inc=1, successful=True):
-            db_query = {
-                "$set": {"words.$[elem].last_answer": time.time()},
-            }
-            if successful:
-                db_query["$inc"] = {"words.$[elem].bin": inc}
-            else:
-                db_query["$inc"] = {
-                    "words.$[elem].bin": inc,
-                    "words.$[elem].wrong_count": 1,
-                }
-            return db_query
-
-        if successful:  # If answered correctly
-            query = increment_query(1)  # Move up 1 in bin/competence
-        else:
-            if data["bin"] == 0:
-                query = increment_query(1, successful=False)
-            elif data["bin"] == 1:
-                query = increment_query(0, successful=False)
-            else:
-                query = increment_query(-1, successful=False)
-        # Query to perform necessary updates
-        user = db["users"].find_one_and_update(
-            {"_id": data["user"]},
-            query,
-            array_filters=[{"elem.word": data["word"]}],
-            return_document=ReturnDocument.AFTER,
-        )
-        return {"success": True, "user": user}
-    except Exception as E:
-        print(E)
-        return {"success": False}
-
+    data = request.json
+    success, user = process_user_submission(db, data)
+    return {"success": success, "user": user}
 
 # This function exists to synchronize user words with the words database
 @flashcards.route("/update_user_words", methods=["POST"])
 @mongo
 def update_user_words(db):
     try:
-        if request.json[
-            "user_id"
-        ]:  # would confirm admin privilege to do so in secure set up
+        if request.json.get('user_id'):  # would confirm admin token in secure set up
             user_id = request.json["user_id"]
         else:
             user_id = request.cookies.get("_id")
-        # Get the user
         user = db["users"].find_one({"_id": user_id})
         user_words = user["words"]
         # Get all words as an array for easier comparison
@@ -188,7 +142,7 @@ def update_user_words(db):
         return {"success": True, "user": user}
     except Exception as E:
         print(E)
-        return {"success": False, "user": user}
+        return {"success": False}
 
 
 @flashcards.route("/update_name", methods=["POST"])
