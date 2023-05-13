@@ -60,7 +60,8 @@ def create_user(db):
                 "last_answer": time.time(),  # initial setting allows word to appears
             }
         )
-    db["users"].insert_one({"_id": _id, 
+    db["users"].insert_one({
+                            "_id": _id, 
                             "words": user_words,
                             "admin":True #In this simple implementation, there are no safeguards for admin page
                             })
@@ -89,11 +90,11 @@ def submit_result(db):
         successful = data["result"]
 
         # Function to standardize/DRY update queries
-        def increment_query(inc=1):
+        def increment_query(inc=1,successful=True):
             db_query = {
                 "$set": {"words.$[elem].last_answer": time.time()},
             }
-            if inc > 0:
+            if successful:
                 db_query["$inc"] = {"words.$[elem].bin": inc}
             else:
                 db_query["$inc"] = {
@@ -106,9 +107,11 @@ def submit_result(db):
             query = increment_query(1) # Move up 1 in bin/competence
         else:
             if data["bin"] == 0:
-                query = increment_query(0)
+                query = increment_query(1,successful=False)
+            elif data["bin"] == 1:
+                query = increment_query(0,successful=False)
             else:
-                query = increment_query(-1)
+                query = increment_query(-1,successful=False)
         # Query to perform necessary updates
         user = db["users"].find_one_and_update(
             {"_id": data["user"]},
