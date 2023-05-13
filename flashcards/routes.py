@@ -83,7 +83,7 @@ def get_user(db):
 def get_all_users(db):
     try:
         users = list(db["users"].find())
-        return {"users": users, "success": True}
+        return {"users": users[::-1], "success": True}
     except Exception as E:
         return {"success": False}
 
