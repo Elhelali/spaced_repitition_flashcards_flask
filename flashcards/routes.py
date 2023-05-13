@@ -79,6 +79,15 @@ def get_user(db):
         return {"user": user, "success": True}
     except Exception as E:
         return {"success": False}
+    
+@flashcards.route("/get_all_users")
+@mongo
+def get_all_users(db):
+    try:
+        users = list(db["users"].find())
+        return {"users": users, "success": True}
+    except Exception as E:
+        return {"success": False}
 
 
 #Submit a user's answer and update their progress.
@@ -129,7 +138,10 @@ def submit_result(db):
 @mongo
 def update_user_words(db):
     try:
-        user_id = request.cookies.get("_id")
+        if request.json['user_id']: #would confirm admin privilege to do so in secure set up
+            user_id = request.json['user_id']
+        else:
+            user_id = request.cookies.get("_id")
         #Get the user
         user = db["users"].find_one({"_id": user_id})
         user_words = user["words"]
