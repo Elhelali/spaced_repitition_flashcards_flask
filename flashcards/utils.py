@@ -30,9 +30,9 @@ def build_update_query(inc=1, successful=True):
         db_query["$inc"] = {"words.$[elem].bin": inc}
     else:
         db_query["$inc"] = {
-            "words.$[elem].bin": inc,
-            "words.$[elem].wrong_count": 1,
+            "words.$[elem].wrong_count": 1
         }
+        db_query["$set"]["words.$[elem].bin"] = 1
     return db_query
 
 # Function to standardize/DRY user submission update queries
@@ -41,12 +41,7 @@ def determine_bin_increment(bin,successful):
     if successful:  # If answered correctly
         query = build_update_query(1)  # Move up 1 in bin/competence
     else:
-        if bin == 0:
-            query = build_update_query(1, successful=False)
-        elif bin == 1:
-            query = build_update_query(0, successful=False)
-        else:
-            query = build_update_query(-1, successful=False)
+        query = build_update_query(successful=False)
     return query
 
 
