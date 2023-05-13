@@ -52,7 +52,8 @@ def create_user(db):
     user_words = []
     for word in words:
         user_words.append(
-            {
+            {   
+                "name":"",
                 "word": word["_id"], #word id = the word itself
                 "definition": word["definition"], #word definition
                 "bin": 0, #bins go from 0 to 11, higher bins represent higher competence
@@ -181,3 +182,15 @@ def update_user_words(db):
     except Exception as E:
         print(E)
         return {"success": False, "user": user}
+
+
+@flashcards.route("/update_name", methods=["POST"])
+@mongo
+def update_name(db):
+    try:
+        id = request.cookies.get("_id")
+        db['users'].update_one({"_id":id},{"$set":{"name":request.json['name']}})
+        return {"success": True}
+    except Exception as E:
+        print(E)
+        return {"success": False}
